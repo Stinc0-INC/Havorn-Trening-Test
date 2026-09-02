@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#082c25">
+  <title>Havørn Trening</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card">
+      <img src="Havorn-logo.png" alt="Havørn-logo">
+      <div class="eyebrow">HAVØRN TRENING</div>
+      <h1>Logg inn</h1>
+      <label>Brukernavn<input id="login-username" autocomplete="username" required></label>
+      <label>Passord<input id="login-password" type="password" autocomplete="current-password" required></label>
+      <div id="login-error" class="login-error" hidden>Feil brukernavn eller passord.</div>
+      <button class="primary" type="submit">Logg inn</button>
+    </form>
+  </section>
+  <div id="app-shell" hidden>
+  <header class="topbar">
+    <button class="brand" data-view="attendance" aria-label="Gå til oppmøte">
+      <img src="Havorn-logo.png" alt="Havørn-logo">
+      <span><strong>Havørn</strong><small>Treningsgrupper</small></span>
+    </button>
+    <div class="top-actions"><button class="admin-link" data-view="admin">Admin</button><button id="logout" class="admin-link">Logg ut</button></div>
+  </header>
+
+  <main>
+    <section class="view active" id="attendance-view">
+      <div class="eyebrow">DAGENS TRENING</div>
+
+      <div class="card import-card">
+        <div><strong>Importer fra Spond</strong><small>Excel (.xlsx/.xls) eller CSV. Filen behandles bare i nettleseren.</small></div>
+        <label class="file-button">Velg fil<input id="spond-file" type="file" accept=".xlsx,.xls,.csv"></label>
+      </div>
+      <div id="import-message" class="message" hidden></div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><h2>Spillere</h2></div>
+          <strong class="count" id="attendance-count">0 kommer</strong>
+        </div>
+        <div class="toolbar">
+          <button id="select-all">Velg alle</button>
+          <button id="clear-all">Nullstill</button>
+          <button id="add-guest">+ Gjest</button>
+        </div>
+        <div id="attendance-list" class="player-list"></div>
+      </div>
+      <button id="to-groups" class="primary sticky">Fortsett til grupper</button>
+    </section>
+
+    <section class="view" id="groups-view">
+      <button class="back" data-view="attendance">← Tilbake til oppmøte</button>
+      <div class="eyebrow">GRUPPEFORDELING</div>
+      <div class="card group-controls">
+        <div><span>Spillere</span><strong id="group-player-count">0</strong></div>
+        <label>Antall grupper<input id="group-count" type="number" min="1" max="10" value="4"></label>
+        <div><span>Ca. per gruppe</span><strong id="per-group">0</strong></div>
+      </div>
+      <div id="groups-grid" class="groups-grid"></div>
+      <details class="play-section" open>
+        <summary class="section-heading"><div class="eyebrow">SPILL NIVÅ</div><span class="section-toggle">⌄</span></summary>
+        <div id="matches-grid" class="matches-grid"></div>
+      </details>
+      <details class="play-section" open>
+        <summary class="section-heading mixed-heading"><div class="eyebrow">SPILL</div><span class="section-toggle">⌄</span></summary>
+        <div id="mixed-teams-grid" class="mixed-teams-grid"></div>
+      </details>
+    </section>
+
+    <section class="view" id="admin-view">
+      <button class="back" data-view="attendance">← Tilbake</button>
+      <div class="eyebrow">KUN FOR ADMIN</div>
+      <h1>Spillerliste og rangering</h1>
+      <div class="notice">Denne lokale prototypen har ikke ekte innlogging ennå. Før publisering kobles adminområdet til sikker tilgang for utvalgte trenere.</div>
+      <div class="card">
+        <div class="card-head"><div><small>RANGERING</small><h2>Spiller 1–42</h2></div><button id="reset-roster">Tilbakestill spillerliste</button></div>
+        <p class="hint">Bruk pilene for å endre rangering. Merk lagets faste keepere; de blir automatisk valgt som keepere når de registreres på trening. Endringer lagres på denne enheten.</p>
+        <div id="admin-list" class="admin-list"></div>
+        <button id="add-player" class="secondary full">+ Legg til spiller</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="name-dialog">
+    <form id="name-form" class="dialog-card">
+      <h2 id="dialog-title">Legg til spiller</h2>
+      <label>Navn<input id="name-input" autocomplete="off" required></label>
+      <div class="dialog-actions"><button type="button" id="cancel-dialog">Avbryt</button><button class="primary" type="submit">Lagre</button></div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+  </div>
+</body>
+</html>
