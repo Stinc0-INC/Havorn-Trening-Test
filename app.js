@@ -27,6 +27,7 @@ let roster = loadRoster();
 let attendance = new Set(load(ATTENDANCE_KEY, []));
 let trainingKeepers = new Set(load(TRAINING_KEEPERS_KEY, []));
 let guests = [];
+let middleAssignments = new Map();
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -80,7 +81,8 @@ function renderAttendance() {
     const selected = attendance.has(p.id);
     const keeper = trainingKeepers.has(p.id);
     const rank = roster.findIndex(item => item.id === p.id) + 1;
-    return `<div class="player-check ${selected ? "selected" : ""}"><label class="attendance-choice"><input type="checkbox" data-attendance-id="${p.id}" ${selected ? "checked" : ""}><span class="rank">${rank || "G"}</span><span><strong>${escapeHtml(p.name)}</strong><small>${rank ? `Rangering ${rank}${p.isGoalkeeper ? " · Fast keeper" : ""}` : "Gjestespiller"}</small></span></label><label class="keeper-choice ${keeper ? "active" : ""}"><input type="checkbox" data-training-keeper="${p.id}" ${keeper ? "checked" : ""} ${selected ? "" : "disabled"}>Keeper</label></div>`;
+    const playerNote = rank ? (p.isGoalkeeper ? "Fast keeper" : "") : "Gjestespiller";
+    return `<div class="player-check ${selected ? "selected" : ""}"><label class="attendance-choice"><input type="checkbox" data-attendance-id="${p.id}" ${selected ? "checked" : ""}><span class="rank">${rank || "G"}</span><span><strong>${escapeHtml(p.name)}</strong>${playerNote ? `<small>${playerNote}</small>` : ""}</span></label><label class="keeper-choice ${keeper ? "active" : ""}"><input type="checkbox" data-training-keeper="${p.id}" ${keeper ? "checked" : ""} ${selected ? "" : "disabled"}>Keeper</label></div>`;
   }).join("");
   $("#attendance-count").textContent = `${selectedPlayers().length} kommer · ${trainingKeepers.size} keepere`;
   $$('[data-attendance-id]').forEach(input => input.addEventListener("change", () => {
@@ -148,10 +150,25 @@ function renderGroups() {
 function renderMatches(groups, selectedKeepers) {
   const fieldPlayers = groups.flat();
   const matchKeepers = [selectedKeepers.slice(0, 2), selectedKeepers.slice(2, 4)];
-  const totalPlayers = fieldPlayers.length + matchKeepers.flat().length;
-  const matchOneTarget = Math.floor(totalPlayers / 4) * 2;
-  const matchOneFieldCount = Math.max(0, matchOneTarget - matchKeepers[0].length);
-  const fieldPools = [fieldPlayers.slice(0, matchOneFieldCount), fieldPlayers.slice(matchOneFieldCount)];
+  const basePerTeam = Math.floor(fieldPlayers.length / 4);
+  const matchCoreSize = basePerTeam * 2;
+  const middleStart = matchCoreSize;
+  const middleEnd = fieldPlayers.length - matchCoreSize;
+  const middlePlayers = fieldPlayers.slice(middleStart, middleEnd);
+  const validMiddleIds = new Set(middlePlayers.map(player => player.id));
+  middleAssignments = new Map([...middleAssignments].filter(([id]) => validMiddleIds.has(id)));
+  const assignedUp = middlePlayers.filter(player => middleAssignments.get(player.id) === 0);
+  const assignedDown = middlePlayers.filter(player => middleAssignments.get(player.id) === 1);
+  const fieldPools = [
+    [...fieldPlayers.slice(0, middleStart), ...assignedUp],
+    [...assignedDown, ...fieldPlayers.slice(middleEnd)]
+  ];
+  const middlePanel = $("#middle-players");
+  middlePanel.hidden = middlePlayers.length === 0;
+  middlePanel.innerHTML = middlePlayers.length ? `<div class="middle-head"><strong>Mellomgruppe</strong><span>Velg kamp for ${middlePlayers.length} spiller${middlePlayers.length === 1 ? "" : "e"}</span></div>${middlePlayers.map(player => {
+    const assignment = middleAssignments.get(player.id);
+    return `<div class="middle-row"><span><i class="rank">${roster.findIndex(item => item.id === player.id) + 1 || "G"}</i><strong>${escapeHtml(player.name)}</strong></span><div><button class="${assignment === 0 ? "active" : ""}" data-middle-player="${player.id}" data-middle-match="0">Kamp 1</button><button class="${assignment === 1 ? "active" : ""}" data-middle-player="${player.id}" data-middle-match="1">Kamp 2</button></div></div>`;
+  }).join("")}` : "";
   const matches = fieldPools.map((pool, matchIndex) => {
     const teams = splitBalancedTeams(pool);
     if (matchKeepers[matchIndex][0]) teams[0].unshift(matchKeepers[matchIndex][0]);
@@ -169,6 +186,12 @@ function renderMatches(groups, selectedKeepers) {
     const secondColor = TEAM_COLORS[(match.second ?? match.first) % TEAM_COLORS.length];
     return `<article class="match-card"><div class="match-title"><strong>Kamp ${matchIndex + 1}</strong></div><div class="team-split"><div class="team ${firstColor.className}-team"><b>${firstColor.name.toUpperCase()} · ${match.teams[0].length}</b>${match.teams[0].map(p => playerLine(p, match.keepers.a)).join("")}</div><div class="team ${secondColor.className}-team"><b>${secondColor.name.toUpperCase()} · ${match.teams[1].length}</b>${match.teams[1].map(p => playerLine(p, match.keepers.b)).join("")}</div></div></article>`;
   }).join("");
+  $$('[data-middle-player]').forEach(button => button.addEventListener("click", () => {
+    const playerId = button.dataset.middlePlayer;
+    const matchIndex = Number(button.dataset.middleMatch);
+    middleAssignments.get(playerId) === matchIndex ? middleAssignments.delete(playerId) : middleAssignments.set(playerId, matchIndex);
+    renderMatches(groups, selectedKeepers);
+  }));
 }
 function renderMixedTeams(fieldPlayers, keepers) {
   const teamCount = Math.min(4, Math.max(fieldPlayers.length + keepers.length, 1));
