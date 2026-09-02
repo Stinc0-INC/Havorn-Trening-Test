@@ -17,11 +17,16 @@ const PLAYER_NAMES = [
   "Simon", "Heine", "William", "Felix", "Noah", "Emil", "Nils", "Nojus", "Herman",
   "Mark", "Johannes", "Hud", "Sebastian F", "Wilhelm", "Magnus", "Håkon N", "Isaac", "Martin"
 ];
-const defaultRoster = () => PLAYER_NAMES.map((name, i) => ({ id: `p${i + 1}`, name }));
+const DEFAULT_KEEPER_NAMES = new Set(["Felix", "Heine", "Noah", "Jonas"]);
+const defaultRoster = () => PLAYER_NAMES.map((name, i) => ({ id: `p${i + 1}`, name, isGoalkeeper: DEFAULT_KEEPER_NAMES.has(name) }));
 function loadRoster() {
   const stored = load(STORAGE_KEY, null);
   const isOldTestList = Array.isArray(stored) && stored.length === 42 && stored.every((p, i) => p.name === `Spiller ${i + 1}`);
-  return !stored || isOldTestList ? defaultRoster() : stored;
+  if (!stored || isOldTestList) return defaultRoster();
+  return stored.map(player => ({
+    ...player,
+    isGoalkeeper: typeof player.isGoalkeeper === "boolean" ? player.isGoalkeeper : DEFAULT_KEEPER_NAMES.has(player.name)
+  }));
 }
 let roster = loadRoster();
 let attendance = new Set(load(ATTENDANCE_KEY, []));
