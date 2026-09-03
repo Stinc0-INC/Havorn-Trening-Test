@@ -240,12 +240,12 @@ async function importSpond(file) {
     rows.forEach(row => {
       const value = String(row[0] || "").trim();
       const normalized = normalize(value);
-      if (/^deltar\b/.test(normalized)) { section = "deltar"; return; }
-      if (/^(ikke svart|kommer ikke)\b/.test(normalized)) { section = "other"; return; }
+      if (/^(deltar|deltatt)\b/.test(normalized)) { section = "deltar"; return; }
+      if (/^(ikke svart|kommer ikke|sent oppmøte|gyldig fravær|ikke deltatt)\b/.test(normalized)) { section = "other"; return; }
       if (normalized === "navn") return;
       if (section === "deltar" && value) incoming.push(value);
     });
-    if (!incoming.length) throw new Error("Fant ingen spillere under «Deltar» i kolonne A.");
+    if (!incoming.length) throw new Error("Fant ingen spillere under «Deltar» eller «Deltatt» i kolonne A.");
     const matched = [], unknown = [], ambiguous = [];
     incoming.forEach(name => {
       const candidates = roster.filter(player => rosterNameMatches(player.name, name));
