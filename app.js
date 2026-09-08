@@ -135,16 +135,16 @@ function renderGroups() {
   const keepers = players.filter(player => trainingKeepers.has(player.id));
   const fieldPlayers = players.filter(player => !trainingKeepers.has(player.id));
   const requested = Number($("#group-count").value) || 1;
-  const count = Math.max(1, Math.min(requested, Math.max(fieldPlayers.length, 1)));
-  const base = Math.floor(fieldPlayers.length / count);
-  const extra = fieldPlayers.length % count;
+  const count = Math.max(1, Math.min(requested, Math.max(players.length, 1)));
+  const base = Math.floor(players.length / count);
+  const extra = players.length % count;
   const groups = [];
   let cursor = 0;
   for (let i = 0; i < count; i++) {
     const size = base + (i < extra ? 1 : 0);
-    groups.push(fieldPlayers.slice(cursor, cursor + size)); cursor += size;
+    groups.push(players.slice(cursor, cursor + size)); cursor += size;
   }
-  $("#per-group").textContent = fieldPlayers.length ? `${base}–${Math.ceil(fieldPlayers.length / count)}` : "0";
+  $("#per-group").textContent = players.length ? `${base}–${Math.ceil(players.length / count)}` : "0";
   $("#groups-grid").innerHTML = groups.map((group, index) => {
     const color = TEAM_COLORS[index % TEAM_COLORS.length];
     return `<details class="group-card" open><summary class="group-title ${color.className}"><strong>${color.name}</strong><span>${group.length} spillere <i>⌄</i></span></summary><ol>${group.map(p => `<li><span class="rank">${roster.findIndex(x => x.id === p.id) + 1 || "G"}</span>${escapeHtml(p.name)}</li>`).join("")}</ol></details>`;
@@ -152,8 +152,49 @@ function renderGroups() {
   renderMatches(groups, keepers);
   renderMixedTeams(fieldPlayers, keepers);
 }
+const teamEdits = {};
+function prepareTeamEdits(mode, teams) {
+  const signature = JSON.stringify(teams.map(team => team.map(p => p.id)));
+  if (teamEdits[mode]?.signature !== signature) teamEdits[mode] = { signature, swaps: [], selected: null, message: "" };
+  for (const [first, second] of teamEdits[mode].swaps) {
+    const a = teams.find(team => team.some(p => p.id === first));
+    const b = teams.find(team => team.some(p => p.id === second));
+    const ai = a.findIndex(p => p.id === first), bi = b.findIndex(p => p.id === second);
+    [a[ai], b[bi]] = [b[bi], a[ai]];
+  }
+}
+function swapPlayerButton(player, mode) {
+  const selected = teamEdits[mode].selected === player.id;
+  return `<button type="button" class="swap-player${selected ? " swap-selected" : ""}${trainingKeepers.has(player.id) ? " swap-keeper" : ""}" data-swap-mode="${mode}" data-swap-player="${player.id}" aria-pressed="${selected}">${trainingKeepers.has(player.id) ? "KEEPER · " : ""}${escapeHtml(player.name)}</button>`;
+}
+function bindTeamSwaps(mode, teams, render) {
+  const state = teamEdits[mode];
+  const selected = teams.flat().find(p => p.id === state.selected);
+  $(`#${mode}-swap-status`).textContent = selected ? `${selected.name} er valgt. Trykk på en spiller på et annet lag for å bytte, eller samme navn for å avbryte.` : state.message || "Bytt spillere: Trykk på ett navn, deretter et navn på et annet lag.";
+  $$(`[data-swap-mode="${mode}"]`).forEach(button => button.addEventListener("click", () => {
+    const id = button.dataset.swapPlayer;
+    if (!state.selected || state.selected === id) {
+      state.selected = state.selected === id ? null : id;
+    } else {
+      const firstTeam = teams.find(team => team.some(p => p.id === state.selected));
+      const secondTeam = teams.find(team => team.some(p => p.id === id));
+      if (firstTeam === secondTeam) {
+        state.selected = id;
+      } else {
+        const first = firstTeam.find(p => p.id === state.selected);
+        const second = secondTeam.find(p => p.id === id);
+        state.swaps.push([first.id, second.id]);
+        state.message = `${first.name} og ${second.name} har byttet lag. Trykk på et navn for et nytt bytte.`;
+        state.selected = null;
+      }
+    }
+    render();
+    document.querySelector(`[data-swap-mode="${mode}"][data-swap-player="${id}"]`)?.focus({ preventScroll: true });
+  }));
+}
 function renderMatches(groups, selectedKeepers) {
-  const fieldPlayers = groups.flat();
+  const keeperIds = new Set(selectedKeepers.map(player => player.id));
+  const fieldPlayers = groups.flat().filter(player => !keeperIds.has(player.id));
   const matchKeepers = [selectedKeepers.slice(0, 2), selectedKeepers.slice(2, 4)];
   const basePerTeam = Math.floor(fieldPlayers.length / 4);
   const matchCoreSize = basePerTeam * 2;
@@ -185,12 +226,15 @@ function renderMatches(groups, selectedKeepers) {
       teams
     };
   });
-  const playerLine = (player, keeperId) => `<span class="${player.id === keeperId ? "keeper-player" : ""}">${player.id === keeperId ? "KEEPER · " : ""}${escapeHtml(player.name)}</span>`;
+  const matchTeams = matches.flatMap(match => match.teams);
+  prepareTeamEdits("matches", matchTeams);
+  const playerLine = player => swapPlayerButton(player, "matches");
   $("#matches-grid").innerHTML = matches.map((match, matchIndex) => {
     const firstColor = TEAM_COLORS[match.first % TEAM_COLORS.length];
     const secondColor = TEAM_COLORS[(match.second ?? match.first) % TEAM_COLORS.length];
     return `<article class="match-card"><div class="match-title"><strong>Kamp ${matchIndex + 1}</strong></div><div class="team-split"><div class="team ${firstColor.className}-team"><b>${firstColor.name.toUpperCase()} · ${match.teams[0].length}</b>${match.teams[0].map(p => playerLine(p, match.keepers.a)).join("")}</div><div class="team ${secondColor.className}-team"><b>${secondColor.name.toUpperCase()} · ${match.teams[1].length}</b>${match.teams[1].map(p => playerLine(p, match.keepers.b)).join("")}</div></div></article>`;
   }).join("");
+  bindTeamSwaps("matches", matchTeams, () => renderMatches(groups, selectedKeepers));
   $$('[data-middle-player]').forEach(button => button.addEventListener("click", () => {
     const playerId = button.dataset.middlePlayer;
     const matchIndex = Number(button.dataset.middleMatch);
@@ -202,10 +246,12 @@ function renderMixedTeams(fieldPlayers, keepers) {
   const teamCount = Math.min(4, Math.max(fieldPlayers.length + keepers.length, 1));
   const teams = splitIntoBalancedTeams(fieldPlayers, teamCount);
   keepers.forEach((keeper, index) => teams[index % teamCount].unshift(keeper));
+  prepareTeamEdits("mixed", teams);
   $("#mixed-teams-grid").innerHTML = teams.map((team, index) => {
     const color = TEAM_COLORS[index % TEAM_COLORS.length];
-    return `<article class="mixed-team"><div class="mixed-team-title ${color.className}"><strong>${color.name}</strong><span>${team.length} spillere</span></div><ol>${team.map(p => `<li class="${trainingKeepers.has(p.id) ? "mixed-keeper" : ""}"><span class="rank">${trainingKeepers.has(p.id) ? "K" : roster.findIndex(x => x.id === p.id) + 1 || "G"}</span>${trainingKeepers.has(p.id) ? "KEEPER · " : ""}${escapeHtml(p.name)}</li>`).join("")}</ol></article>`;
+    return `<article class="mixed-team"><div class="mixed-team-title ${color.className}"><strong>${color.name}</strong><span>${team.length} spillere</span></div><ol>${team.map(p => `<li><span class="rank">${trainingKeepers.has(p.id) ? "K" : roster.findIndex(x => x.id === p.id) + 1 || "G"}</span>${swapPlayerButton(p, "mixed")}</li>`).join("")}</ol></article>`;
   }).join("");
+  bindTeamSwaps("mixed", teams, () => renderMixedTeams(fieldPlayers, keepers));
 }
 
 function renderAdmin() {
