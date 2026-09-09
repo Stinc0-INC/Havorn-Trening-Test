@@ -1,6 +1,7 @@
 const STORAGE_KEY = "havorn-training-roster-v1";
 const ATTENDANCE_KEY = "havorn-training-attendance-v1";
 const TRAINING_KEEPERS_KEY = "havorn-training-keepers-v1";
+const ISAK_MIGRATION_KEY = "havorn-training-isak-v1";
 const TEAM_COLORS = [
   { name: "Blå", className: "color-blue" },
   { name: "Grønn", className: "color-green" },
@@ -15,18 +16,26 @@ const PLAYER_NAMES = [
   "Sebastian Y", "Lars", "Theodor", "Eskil", "Ulrik", "Sander", "Aslak", "Lucas",
   "Gabriel", "Aksel", "Jakob", "Elias", "Jonas", "Patrick", "Tobias", "Mio", "Trym",
   "Simon", "Heine", "William", "Felix", "Noah", "Emil", "Nils", "Nojus", "Herman",
-  "Mark", "Johannes", "Hud", "Sebastian F", "Wilhelm", "Magnus", "Håkon N", "Isaac", "Martin"
+  "Mark", "Johannes", "Hud", "Sebastian F", "Wilhelm", "Magnus", "Håkon N", "Isaac", "Martin", "Isak"
 ];
 const DEFAULT_KEEPER_NAMES = new Set(["Felix", "Heine", "Noah", "Jonas"]);
 const defaultRoster = () => PLAYER_NAMES.map((name, i) => ({ id: `p${i + 1}`, name, isGoalkeeper: DEFAULT_KEEPER_NAMES.has(name) }));
 function loadRoster() {
   const stored = load(STORAGE_KEY, null);
   const isOldTestList = Array.isArray(stored) && stored.length === 42 && stored.every((p, i) => p.name === `Spiller ${i + 1}`);
-  if (!stored || isOldTestList) return defaultRoster();
-  return stored.map(player => ({
+  const players = (!stored || isOldTestList ? defaultRoster() : stored).map(player => ({
     ...player,
     isGoalkeeper: typeof player.isGoalkeeper === "boolean" ? player.isGoalkeeper : DEFAULT_KEEPER_NAMES.has(player.name)
   }));
+  // Upgrade existing lists once, preserving local ranking and later admin edits.
+  if (!load(ISAK_MIGRATION_KEY, false)) {
+    const existing = players.find(player => ["isak", "isak hofvander søiland"].includes(player.name.trim().toLocaleLowerCase("nb-NO")));
+    if (existing) existing.name = "Isak";
+    else players.push({ id: "p43", name: "Isak", isGoalkeeper: false });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+    localStorage.setItem(ISAK_MIGRATION_KEY, "true");
+  }
+  return players;
 }
 let roster = loadRoster();
 let attendance = new Set(load(ATTENDANCE_KEY, []));
@@ -313,7 +322,7 @@ $("#clear-all").addEventListener("click", () => { attendance.clear(); trainingKe
 $("#to-groups").addEventListener("click", () => selectedPlayers().length ? showView("groups") : alert("Velg minst én spiller først."));
 $("#group-count").addEventListener("input", renderGroups);
 $("#spond-file").addEventListener("change", event => importSpond(event.target.files[0]));
-$("#reset-roster").addEventListener("click", () => { if (confirm("Tilbakestille navn, keepervalg og rangering til den opprinnelige listen med 42 spillere?")) { roster = defaultRoster(); attendance.clear(); trainingKeepers.clear(); save(); renderAdmin(); renderAttendance(); } });
+$("#reset-roster").addEventListener("click", () => { if (confirm(`Tilbakestille navn, keepervalg og rangering til den opprinnelige listen med ${PLAYER_NAMES.length} spillere?`)) { roster = defaultRoster(); attendance.clear(); trainingKeepers.clear(); save(); renderAdmin(); renderAttendance(); } });
 $("#add-player").addEventListener("click", () => { $("#dialog-title").textContent = "Legg til spiller"; $("#name-input").value = ""; $("#name-dialog").showModal(); });
 $("#add-guest").addEventListener("click", () => { $("#dialog-title").textContent = "Legg til gjest for i dag"; $("#name-input").value = ""; $("#name-dialog").dataset.guest = "true"; $("#name-dialog").showModal(); });
 $("#cancel-dialog").addEventListener("click", () => { delete $("#name-dialog").dataset.guest; $("#name-dialog").close(); });

@@ -22,4 +22,4 @@ Denne versjonen lagrer data lokalt i nettleseren og er laget for funksjonstestin
 
 ## Spillerliste
 
-Spillerlisten inneholder 42 spillere i intern rangeringsrekkefølge. Håkon R er nummer 1 og Martin er nummer 42.
+Spillerlisten inneholder 43 spillere i intern rangeringsrekkefølge. Håkon R er nummer 1, Martin er nummer 42 og Isak er foreløpig nummer 43. Excel-navnet «Isak Hofvander Søiland» gjenkjennes som Isak ved import. Eksisterende lokale spillerlister får Isak lagt til én gang, uten å tilbakestille rangering eller keepervalg.
